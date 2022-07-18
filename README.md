@@ -47,6 +47,7 @@ To download the `wings-install.sh` file, you can use
 
 ```
 wget https://raw.githubusercontent.com/User-92/wings-installer/master/wings-install.sh
+chmod u+x wings-installer.sh
 ```
 and run it as root with:
 ```

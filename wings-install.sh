@@ -21,7 +21,7 @@ fi
 GITHUB_BRANCH="master"
 
 WINGS_REPO="https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_"
-GITHUB_INSTALLER="https://github.com/User-92/wings-installer/$GITHUB_BRANCH"
+GITHUB_INSTALLER="https://raw.githubusercontent.com/User-92/wings-installer/$GITHUB_BRANCH"
 EMAIL_REGEX="^(([A-Za-z0-9]+((\.|\-|\_|\+)?[A-Za-z0-9]?)*[A-Za-z0-9]+)|[A-Za-z0-9]+)@(([A-Za-z0-9]+)+((\.|\-|\_)?([A-Za-z0-9]+)+)*)+\.([A-Za-z]{2,})+$"
 
 # Let's Encrypt
@@ -75,7 +75,7 @@ install_docker() {
 		fi
 	fi
 
-	if [ CONTINUE_INSTALL == true ]; then
+	if [ $CONTINUE_INSTALL == true ]; then
         apt-get -y install \
             apt-transport-https \
             ca-certificates \
