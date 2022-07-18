@@ -8,60 +8,30 @@ echo "#  pterodactyl project                              #"
 echo "#####################################################"
 
 # TODO:
-# 1. Add Daemon Creation
-# 2. Add certbot autorenew
-# 3. Add option to enable swap
-# 4. Add support for more distros
+# 1. Add option to enable swap
+# 2. Add support for more distros
 
 if [[ $EUID -ne 0 ]]; then
 	echo "ERROR: Invalid Permissions. This script needs to be run as root!" 1>&2
 	exit 1
 fi
 
-# VARIABLES
+# VARIABLES --------------------------------------------------------------------
+
+GITHUB_BRANCH="master"
+
 WINGS_REPO="https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_"
+GITHUB_INSTALLER="https://github.com/User-92/wings-installer/$GITHUB_BRANCH"
 EMAIL_REGEX="^(([A-Za-z0-9]+((\.|\-|\_|\+)?[A-Za-z0-9]?)*[A-Za-z0-9]+)|[A-Za-z0-9]+)@(([A-Za-z0-9]+)+((\.|\-|\_)?([A-Za-z0-9]+)+)*)+\.([A-Za-z]{2,})+$"
+
+# Let's Encrypt
+CONFIGURE_CERTS=false
+FQDN=""
+EMAIL=""
 
 ###############################################
 #            OS CHECK FUNCTIONS               #
 ###############################################
-
-detect_distro() {
-  if [ -f /etc/os-release ]; then
-    # freedesktop.org and systemd
-    . /etc/os-release
-    OS=$(echo "$ID" | awk '{print tolower($0)}')
-    OS_VER=$VERSION_ID
-  elif type lsb_release >/dev/null 2>&1; then
-    # linuxbase.org
-    OS=$(lsb_release -si | awk '{print tolower($0)}')
-    OS_VER=$(lsb_release -sr)
-  elif [ -f /etc/lsb-release ]; then
-    # For some versions of Debian/Ubuntu without lsb_release command
-    . /etc/lsb-release
-    OS=$(echo "$DISTRIB_ID" | awk '{print tolower($0)}')
-    OS_VER=$DISTRIB_RELEASE
-  elif [ -f /etc/debian_version ]; then
-    # Older Debian/Ubuntu/etc.
-    OS="debian"
-    OS_VER=$(cat /etc/debian_version)
-  elif [ -f /etc/SuSe-release ]; then
-    # Older SuSE/etc.
-    OS="SuSE"
-    OS_VER="?"
-  elif [ -f /etc/redhat-release ]; then
-    # Older Red Hat, CentOS, etc.
-    OS="Red Hat/CentOS"
-    OS_VER="?"
-  else
-    # Fall back to uname, e.g. "Linux <version>", also works for BSD, etc.
-    OS=$(uname -s)
-    OS_VER=$(uname -r)
-  fi
-
-  OS=$(echo "$OS" | awk '{print tolower($0)}')
-  OS_VER_MAJOR=$(echo "$OS_VER" | cut -d. -f1)
-}
 
 check_architecture() {
 	ARCH=$(uname -m)
@@ -96,9 +66,9 @@ install_docker() {
 	DOCKER_INSTALLED=$(dpkg-query -W --showformat='${Status}\n' docker | grep "install ok installed")
 	
 	CONTINUE_INSTALL=true
-	if [ ! "" = "$DOCKER_INSTALLED"]; then
+	if [ ! "" = "$DOCKER_INSTALLED" ]; then
 		echo "Docker is already installed!"
-		echo "Continue installing docker? (y\N): "
+		echo "Continue installing docker? (y/N): "
 		read -r CINSTALL
 		if [[ ! CINSTALL =~ [Yy] ]]; then
 			CONTINUE_INSTALL=false
@@ -106,18 +76,16 @@ install_docker() {
 	fi
 
 	if [ CONTINUE_INSTALL == true ]; then
-		if [ $OS == "debian" ] || [ $OS == "ubuntu" ]; then
-			apt-get -y install \
-				apt-transport-https \
-				ca-certificates \
-				gnupg2 \
-				software-properties-common
+        apt-get -y install \
+            apt-transport-https \
+            ca-certificates \
+            gnupg2 \
+            software-properties-common
 
-			curl -sSL https://get.docker.com/ | CHANNEL=stable bash
-			
-			echo "Enabling Docker..."
-			systemctl enable --now docker
-		fi
+        curl -sSL https://get.docker.com/ | CHANNEL=stable bash
+        
+        echo "Enabling Docker..."
+        systemctl enable --now docker
 		echo "Docker Installation Finished!"
 	fi
 }
@@ -125,7 +93,7 @@ install_docker() {
 install_wings() {
 	echo "Installing Pterodactyl Wings ..."
 	mkdir -p /etc/pterodactyl
-	curl -L -o /usr/local/bin/wings "$WINGS_REPO$ARCH"
+    curl -L -o /usr/local/bin/wings "$WINGS_REPO$([[ "$ARCH" == "x86_64" ]] && echo "amd64" || echo "arm64")"
 	chmod u+x /usr/local/bin/wings
 	echo "Wings Installation Finished!"
 }
@@ -134,7 +102,14 @@ install_certbot() {
 	echo "Installing certbot ..."
 	apt install -y certbot
 	apt install -y python3-certbot-nginx
-	echo "Certbot Installtion Finished!"
+	echo "Certbot Installation Finished!"
+}
+
+install_wings_daemon() {
+    echo "Installing wings daemon ..."
+    curl -o /etc/systemd/system/wings.service $GITHUB_INSTALLER/files/wings.service
+    systemctl daemon-reload
+    echo "Daemon Installation Finished!"
 }
 
 install_all() {
@@ -146,8 +121,9 @@ install_all() {
 	[ "$CONFIGURE_CERTS" == true ] && config_certs
 }
 
-###########################################
-# CONFIGURE FUNCTIONS
+
+##########################################
+#        CONFIGURE FUNCTIONS             #
 ##########################################
 
 config_certs() {
@@ -163,6 +139,11 @@ config_certs() {
 	fi
 }
 
+enable_autorenew() {
+    CRON_LINE='0 23 * * * certbot renew --quiet --deploy-hook "systemctl restart nginx"'
+    ( crontab -u $(whoami) -l; echo "$CRON_LINE" ) | crontab -u $(whoami) -
+}
+
 valid_email() {
   [[ $EMAIL =~ ${EMAIL_REGEX} ]]
 }
@@ -170,13 +151,12 @@ valid_email() {
 main() {
 	check_pterodactyl
 	check_architecture
-	detect_distro
 	
 	echo "Would you like to configure Let's Encrypt for SSL/HTTPS? (y/N)"
 	read -r CONFIRM_SSL
 	if [[ $CONFIRM_SSL =~ [Yy] ]]; then
 		CONFIGURE_CERTS=true
-	fi
+    fi
 
 	if [[ $CONFIGURE_CERTS == true ]]; then
 		while [ -z "$FQDN" ]; do
@@ -208,13 +188,26 @@ main() {
 		done
 	fi
 
+
 	# Install Wings
 	install_all
 
-	echo "Would you like to make a systemd daemon for wings? (Y/n)"
-	read -r MAKE_DAEMON
-	if [[ $MAKE_DAEMON =~ [Nn] ]]; then
-		echo "Sorry, this isn't available at the moment!"
+    ENABLE_RENEW=false
+	if [[ $CONFIGURE_CERTS == true ]]; then
+        echo -n "Would you like to enable auto renew for Let's Encrypt SSL certificate? (Y/n)"
+        read -r ENABLE_RENEW
+        if [[ ! $ENABLE_RENEW =~ [Nn] ]]; then
+            enable_autorenew
+        fi
+    fi
+
+    DAEMON_RESPONSE=""
+    MAKE_DAEMON=false
+	echo -n "Would you like to make a systemd daemon for wings? (Y/n)"
+	read -r DAEMON_RESPONSE
+	if [[ ! $DAEMON_RESPONSE =~ [Nn] ]]; then
+        MAKE_DAEMON=true
+		install_wings_daemon
 	fi
 
 	echo ""
@@ -226,6 +219,12 @@ main() {
 	echo "* Official Documentation:"
 	echo "* 	 https://pterodactyl.io/wings/1.0/installing.html#configure"
 	echo ""
+	if [[ $MAKE_DAEMON == true ]]; then
+        echo "+ To start the wings daemon, run the command: systemctl enable --now wings"
+    else
+        echo "+ To start wings, run the command: sudo wings --debug"
+    fi
+    echo ""
 }
 
 main
