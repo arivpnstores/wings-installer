@@ -26,8 +26,9 @@ EMAIL_REGEX="^(([A-Za-z0-9]+((\.|\-|\_|\+)?[A-Za-z0-9]?)*[A-Za-z0-9]+)|[A-Za-z0-
 
 # Let's Encrypt
 CONFIGURE_CERTS=false
-FQDN=`echo $1`
+FQDN="$1"
 EMAIL="arivpnstore@gmail.com"
+
 
 ###############################################
 #            OS CHECK FUNCTIONS               #
@@ -151,64 +152,21 @@ valid_email() {
 main() {
 	check_pterodactyl
 	check_architecture
-	
-	echo "Would you like to configure Let's Encrypt for SSL/HTTPS? (y/N)"
-	read -r CONFIRM_SSL
-	if [[ $CONFIRM_SSL =~ [Yy] ]]; then
+
+	if [[ -n "$FQDN" ]]; then
 		CONFIGURE_CERTS=true
-    fi
-
-	if [[ $CONFIGURE_CERTS == true ]]; then
-		while [ -z "$FQDN" ]; do
-			echo -n "Set the FQDN to use for Let's Encrypt (node.example.com): "
-			read -r FQDN
-			CONTINUE=true
-			CONFIRM_CONTINUE="n"
-			[ -z "$FQDN" ] && echo "FQDN is required!"
-			[ -d "/etc/letsencrypt/live/$FQDN/" ] && echo "Certificate with FQDN already exists!" && CONTINUE=false
-			
-			[ $CONTINUE == false ] && FQDN=""
-			[ $CONTINUE == false ] && echo -e -n "Continue with SSL? (y/N)"
-			[ $CONTINUE == false ] && read -r CONFIRM_CONTINUE
-
-			if [[ ! "$CONFIRM_CONTINUE" =~ [Yy] ]] && [ $CONTINUE == false ]; then
-				CONFIGURE_CERTS=false
-				FQDN="none"
-			fi
-		done
 	fi
-	
-	EMAIL=""
-	if [[ $CONFIGURE_CERTS == true ]]; then
-		while ! valid_email "$EMAIL"; do
-			echo -n "Enter email address for Let's Encrypt: "
-			read -r EMAIL
-
-			valid_email "$EMAIL" || echo "Invalid Email!"
-		done
-	fi
-
 
 	# Install Wings
 	install_all
 
-    ENABLE_RENEW=false
+	# Aktifkan auto-renew jika SSL aktif
 	if [[ $CONFIGURE_CERTS == true ]]; then
-        echo -n "Would you like to enable auto renew for Let's Encrypt SSL certificate? (Y/n)"
-        read -r ENABLE_RENEW
-        if [[ ! $ENABLE_RENEW =~ [Nn] ]]; then
-            enable_autorenew
-        fi
-    fi
-
-    DAEMON_RESPONSE=""
-    MAKE_DAEMON=false
-	echo -n "Would you like to make a systemd daemon for wings? (Y/n)"
-	read -r DAEMON_RESPONSE
-	if [[ ! $DAEMON_RESPONSE =~ [Nn] ]]; then
-        MAKE_DAEMON=true
-		install_wings_daemon
+		enable_autorenew
 	fi
+
+	# Langsung buat daemon
+	install_wings_daemon
 
 	echo ""
 	echo "INSTALLATION COMPLETE!"
@@ -219,12 +177,8 @@ main() {
 	echo "* Official Documentation:"
 	echo "* 	 https://pterodactyl.io/wings/1.0/installing.html#configure"
 	echo ""
-	if [[ $MAKE_DAEMON == true ]]; then
-        echo "+ To start the wings daemon, run the command: systemctl enable --now wings"
-    else
-        echo "+ To start wings, run the command: sudo wings --debug"
-    fi
-    echo ""
+	echo "+ To start the wings daemon, run the command: systemctl enable --now wings"
+	echo ""
 }
 
 main
