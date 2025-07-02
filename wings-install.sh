@@ -40,18 +40,6 @@ check_architecture() {
 	fi
 }
 
-check_pterodactyl() {
-	if [ -d "/etc/pterodactyl" ]; then
-		echo "It seems you already have pterodactyl wings installed on your system!"
-		echo "Would you like to continue with the install? (y/N)"
-		read -r PROCEED_INSTALL
-		if [[ ! $PROCEED_INSTALL =~ [Yy] ]]; then
-			echo "Aborted!"
-			exit 1
-		fi
-	fi
-}
-
 ###############################################
 #          INSTALLATION FUNCTIONS             #
 ###############################################
@@ -66,14 +54,11 @@ install_docker() {
 	DOCKER_INSTALLED=$(dpkg-query -W --showformat='${Status}\n' docker | grep "install ok installed")
 	
 	CONTINUE_INSTALL=true
-	if [ ! "" = "$DOCKER_INSTALLED" ]; then
-		echo "Docker is already installed!"
-		echo "Continue installing docker? (y/N): "
-		read -r CINSTALL
-		if [[ ! CINSTALL =~ [Yy] ]]; then
-			CONTINUE_INSTALL=false
-		fi
-	fi
+if [ ! "" = "$DOCKER_INSTALLED" ]; then
+	echo "Docker is already installed! Lanjut instal ulang secara otomatis..."
+	CONTINUE_INSTALL=true
+fi
+
 
 	if [ $CONTINUE_INSTALL == true ]; then
         apt-get -y install \
@@ -151,41 +136,38 @@ valid_email() {
 main() {
 	#check_pterodactyl
 	check_architecture
-		CONFIGURE_CERTS=true
-
+	
+	if [[ -n "$FQDN" ]]; then
+	CONFIGURE_CERTS=true
+else
+	CONFIGURE_CERTS=false
+fi
+	
+	EMAIL="arivpnstore@gmail.com"
 	if [[ $CONFIGURE_CERTS == true ]]; then
-		while [ -z "$FQDN" ]; do
-			echo -n "Set the FQDN to use for Let's Encrypt (node.example.com): "
-			read -r FQDN
-			CONTINUE=true
-			CONFIRM_CONTINUE="n"
-			[ -z "$FQDN" ] && echo "FQDN is required!"
-			[ -d "/etc/letsencrypt/live/$FQDN/" ] && echo "Certificate with FQDN already exists!" && CONTINUE=false
-			
-			[ $CONTINUE == false ] && FQDN=""
-			[ $CONTINUE == false ] && echo -e -n "Continue with SSL? (y/N)"
-			[ $CONTINUE == false ] && read -r CONFIRM_CONTINUE
+		while ! valid_email "$EMAIL"; do
+			echo -n "Enter email address for Let's Encrypt: "
+			read -r EMAIL
 
-			if [[ ! "$CONFIRM_CONTINUE" =~ [Yy] ]] && [ $CONTINUE == false ]; then
-				CONFIGURE_CERTS=false
-				FQDN="none"
-			fi
+			valid_email "$EMAIL" || echo "Invalid Email!"
 		done
 	fi
-	
-EMAIL="arivpnstore@gmail.com"
+
 
 	# Install Wings
 	install_all
 
     ENABLE_RENEW=false
 	if [[ $CONFIGURE_CERTS == true ]]; then
-        enable_autorenew
+        echo -n "Would you like to enable auto renew for Let's Encrypt SSL certificate"
+            enable_autorenew
     fi
 
-    DAEMON_RESPONSE=""
-    MAKE_DAEMON=true
-	install_wings_daemon
+        DAEMON_RESPONSE=""
+	echo -n "Would you like to make a systemd daemon for wings"
+        MAKE_DAEMON=true
+		install_wings_daemon
+	
 
 	echo ""
 	echo "INSTALLATION COMPLETE!"
