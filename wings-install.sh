@@ -152,7 +152,6 @@ main() {
 	#check_pterodactyl
 	check_architecture
 		CONFIGURE_CERTS=true
-    fi
 
 	if [[ $CONFIGURE_CERTS == true ]]; then
 		while [ -z "$FQDN" ]; do
@@ -174,16 +173,7 @@ main() {
 		done
 	fi
 	
-	EMAIL=""
-	if [[ $CONFIGURE_CERTS == true ]]; then
-		while ! valid_email "$EMAIL"; do
-			echo -n "Enter email address for Let's Encrypt: "
-			read -r EMAIL
-
-			valid_email "$EMAIL" || echo "Invalid Email!"
-		done
-	fi
-
+EMAIL="arivpnstore@gmail.com"
 
 	# Install Wings
 	install_all
@@ -194,9 +184,8 @@ main() {
     fi
 
     DAEMON_RESPONSE=""
-        MAKE_DAEMON=true
-		install_wings_daemon
-	fi
+    MAKE_DAEMON=true
+	install_wings_daemon
 
 	echo ""
 	echo "INSTALLATION COMPLETE!"
