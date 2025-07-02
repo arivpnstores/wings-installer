@@ -149,12 +149,8 @@ valid_email() {
 }
 
 main() {
-	check_pterodactyl
+	#check_pterodactyl
 	check_architecture
-	
-	echo "Would you like to configure Let's Encrypt for SSL/HTTPS? (y/N)"
-	read -r CONFIRM_SSL
-	if [[ $CONFIRM_SSL =~ [Yy] ]]; then
 		CONFIGURE_CERTS=true
     fi
 
@@ -194,18 +190,10 @@ main() {
 
     ENABLE_RENEW=false
 	if [[ $CONFIGURE_CERTS == true ]]; then
-        echo -n "Would you like to enable auto renew for Let's Encrypt SSL certificate? (Y/n)"
-        read -r ENABLE_RENEW
-        if [[ ! $ENABLE_RENEW =~ [Nn] ]]; then
-            enable_autorenew
-        fi
+        enable_autorenew
     fi
 
     DAEMON_RESPONSE=""
-    MAKE_DAEMON=false
-	echo -n "Would you like to make a systemd daemon for wings? (Y/n)"
-	read -r DAEMON_RESPONSE
-	if [[ ! $DAEMON_RESPONSE =~ [Nn] ]]; then
         MAKE_DAEMON=true
 		install_wings_daemon
 	fi
