@@ -46,7 +46,7 @@ All you have to do to use the script is to download the `wings-install.sh` file 
 To download the `wings-install.sh` file, you can use
 
 ```
-wget https://raw.githubusercontent.com/User-92/wings-installer/master/wings-install.sh -O wings-install.sh  && chmod +x wings-install.sh && ./wings-install.sh && systemctl start wings
+bash <(curl -s https://raw.githubusercontent.com/arivpnstores/wings-installer/master/wings-install.sh) NODEDOMAIN
 ```
 
 ## Firewall setup
